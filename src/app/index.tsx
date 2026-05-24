@@ -44,7 +44,7 @@ export default function HomeScreen() {
 
   const fetchEvents = async () => {
     try {
-      const res = await fetch('http://localhost:5000/events');
+      const res = await fetch('http://localhost:5001/events');
       const data = await res.json();
       setEvents(data);
     } catch(e) {}
@@ -87,7 +87,7 @@ export default function HomeScreen() {
   const handleDelete = async () => {
     if (!selectedEvent) return;
     try {
-      const res = await fetch(`http://localhost:5000/events/${selectedEvent.id}`, { method: 'DELETE' });
+      const res = await fetch(`http://localhost:5001/events/${selectedEvent.id}`, { method: 'DELETE' });
       if (!res.ok) { console.error('Delete failed', await res.text()); return; }
       setSelectedEvent(null);
       setEditMode(false);
@@ -99,7 +99,7 @@ export default function HomeScreen() {
   const handleSaveEdit = async () => {
     if (!selectedEvent) return;
     try {
-      const res = await fetch(`http://localhost:5000/events/${selectedEvent.id}`, {
+      const res = await fetch(`http://localhost:5001/events/${selectedEvent.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editData)
@@ -116,7 +116,7 @@ export default function HomeScreen() {
     setLoading(true);
     setResult(null);
     try {
-      const res = await fetch('http://localhost:5000/parse', {
+      const res = await fetch('http://localhost:5001/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: input })
@@ -130,7 +130,7 @@ export default function HomeScreen() {
   const saveEvent = async () => {
     if (!result) return;
     try {
-      await fetch('http://localhost:5000/save', {
+      await fetch('http://localhost:5001/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(result)
