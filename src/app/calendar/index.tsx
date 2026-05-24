@@ -9,7 +9,7 @@ export default function CalendarScreen() {
 
   const fetchEvents = async () => {
     try {
-      const response = await fetch('http://localhost:5000/events');
+      const response = await fetch('http://localhost:5001/events');
       const data = await response.json();
       setEvents(data);
     } catch (error) {
