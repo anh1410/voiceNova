@@ -31,7 +31,7 @@ def save_event(event):
         event.get('date'),
         event.get('time'),
         event.get('location'),
-        ', '.join(event.get('people', [])),
+        ', '.join(event.get('people', [])) if isinstance(event.get('people'), list) else event.get('people'),
         event.get('notes')
     ))
     conn.commit()
@@ -44,3 +44,30 @@ def get_all_events():
     events = cursor.fetchall()
     conn.close()
     return events
+
+def delete_event(event_id):
+    conn = sqlite3.connect('planner.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM events WHERE id = ?', (event_id,))
+    conn.commit()
+    conn.close()
+
+def update_event(event_id, event):
+    conn = sqlite3.connect('planner.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE events
+        SET title=?, type=?, date=?, time=?, location=?, people=?, notes=?
+        WHERE id=?
+    ''', (
+        event.get('title'),
+        event.get('type'),
+        event.get('date'),
+        event.get('time'),
+        event.get('location'),
+        ', '.join(event.get('people', [])) if isinstance(event.get('people'), list) else event.get('people'),
+        event.get('notes'),
+        event_id
+    ))
+    conn.commit()
+    conn.close()

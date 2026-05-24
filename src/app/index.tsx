@@ -13,14 +13,34 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(false);
   const [listening, setListening] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
   const [saved, setSaved] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date(2026, 5, 1));
 
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editData, setEditData] = useState<any>(null);
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<any>(null);
+
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
   useEffect(() => { fetchEvents(); }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchEvents = async () => {
     try {
@@ -28,6 +48,67 @@ export default function HomeScreen() {
       const data = await res.json();
       setEvents(data);
     } catch(e) {}
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    if (!query.trim()) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+      return;
+    }
+    const q = query.toLowerCase();
+    const filtered = events.filter(ev =>
+      (ev.title && ev.title.toLowerCase().includes(q)) ||
+      (ev.location && ev.location.toLowerCase().includes(q)) ||
+      (ev.notes && ev.notes.toLowerCase().includes(q)) ||
+      (ev.people && ev.people.toLowerCase().includes(q)) ||
+      (ev.date && ev.date.includes(q)) ||
+      (ev.type && ev.type.toLowerCase().includes(q))
+    );
+    setSearchResults(filtered);
+    setShowSearchResults(true);
+  };
+
+  const openEventCard = (event: any) => {
+    setSelectedEvent(event);
+    setEditData({ ...event });
+    setEditMode(false);
+    setShowSearchResults(false);
+    setSearchQuery('');
+  };
+
+  const closeEventCard = () => {
+    setSelectedEvent(null);
+    setEditMode(false);
+    setEditData(null);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedEvent) return;
+    try {
+      const res = await fetch(`http://localhost:5000/events/${selectedEvent.id}`, { method: 'DELETE' });
+      if (!res.ok) { console.error('Delete failed', await res.text()); return; }
+      setSelectedEvent(null);
+      setEditMode(false);
+      setEditData(null);
+      await fetchEvents();
+    } catch(e) { console.error('Delete error:', e); }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedEvent) return;
+    try {
+      const res = await fetch(`http://localhost:5000/events/${selectedEvent.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editData)
+      });
+      if (!res.ok) { console.error('Update failed', await res.text()); return; }
+      setSelectedEvent(editData);
+      setEditMode(false);
+      await fetchEvents();
+    } catch(e) { console.error('Update error:', e); }
   };
 
   const parseEvent = async () => {
@@ -81,6 +162,8 @@ export default function HomeScreen() {
     return events.some(e => e.date === dateStr);
   };
 
+  const currentMonthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth()+1).padStart(2,'0')}`;
+  const sidebarEvents = events.filter(ev => ev.date && ev.date.startsWith(currentMonthPrefix)).slice(0, 3);
   const upcomingEvents = events.slice(0, 5);
 
   const styles: Record<string, React.CSSProperties> = {
@@ -96,7 +179,6 @@ export default function HomeScreen() {
       position: 'relative',
       color: '#f0c0ff',
     },
-
     sidebar: {
       width: sidebarOpen ? 280 : 0,
       overflow: 'hidden',
@@ -106,7 +188,6 @@ export default function HomeScreen() {
       flexShrink: 0,
     },
     sidebarInner: { width: 280, padding: '14px', boxSizing: 'border-box' },
-
     sidebarTitle: {
       fontFamily: "'Press Start 2P', monospace",
       fontSize: 10,
@@ -116,7 +197,6 @@ export default function HomeScreen() {
       letterSpacing: '2px',
       lineHeight: 1.8,
     },
-
     calHeader: {
       display: 'flex',
       alignItems: 'center',
@@ -138,7 +218,6 @@ export default function HomeScreen() {
       lineHeight: 1.2,
     },
     calMonth: { fontSize: 13, color: '#da70d6', fontWeight: 'bold', letterSpacing: '0.5px' },
-
     calGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 3, marginBottom: 14 },
     calDayHeader: { textAlign: 'center', fontSize: 10, color: '#ff69b4', fontWeight: 'bold', padding: '2px 0' },
     calDay: {
@@ -150,7 +229,6 @@ export default function HomeScreen() {
       border: '1px solid #2a0040',
       background: '#130025',
     },
-
     toggle: {
       position: 'absolute',
       left: sidebarOpen ? 280 : 0,
@@ -168,9 +246,7 @@ export default function HomeScreen() {
       zIndex: 10,
       transition: 'left 0.35s cubic-bezier(0.4,0,0.2,1)',
     },
-
     main: { flex: 1, display: 'flex', flexDirection: 'column', padding: '18px', position: 'relative', overflow: 'hidden' },
-
     topbar: {
       display: 'flex',
       alignItems: 'center',
@@ -188,21 +264,41 @@ export default function HomeScreen() {
       letterSpacing: '1px',
       textShadow: '2px 2px #9b59b6',
     },
-
-    searchWrap: { flex: 1, maxWidth: 280, margin: '0 18px', position: 'relative' as const },
+    searchWrap: { flex: 1, maxWidth: 340, margin: '0 18px', position: 'relative' as const },
     searchBar: {
       width: '100%',
       background: '#1a0030',
       border: '1px solid #9b59b6',
       padding: '6px 10px 6px 28px',
       fontFamily: "'VT323', monospace",
-      fontSize: 13,
+      fontSize: 15,
       color: '#da70d6',
       outline: 'none',
       boxSizing: 'border-box' as const,
     },
     searchIcon: { position: 'absolute' as const, left: 9, top: '50%', transform: 'translateY(-50%)', color: '#ff69b4', fontSize: 13 },
-
+    searchDropdown: {
+      position: 'absolute' as const,
+      top: 'calc(100% + 4px)',
+      left: 0,
+      right: 0,
+      background: '#0d0020',
+      border: '2px solid #ff69b4',
+      zIndex: 200,
+      maxHeight: 260,
+      overflowY: 'auto' as const,
+    },
+    searchResultItem: {
+      padding: '8px 12px',
+      cursor: 'pointer',
+      borderBottom: '1px dashed #2a0040',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: 2,
+    },
+    searchResultTitle: { fontSize: 14, color: '#f0c0ff', fontWeight: 'bold' },
+    searchResultMeta: { fontSize: 11, color: '#ff69b4', opacity: 0.8 },
+    searchNoResult: { padding: '10px 12px', fontSize: 13, color: '#9b59b6' },
     upcomingWrap: { position: 'relative' as const },
     upcomingBtn: {
       background: '#2a0040',
@@ -213,7 +309,6 @@ export default function HomeScreen() {
       color: '#f0c0ff',
       cursor: 'pointer',
     },
-
     dropdown: {
       position: 'absolute' as const,
       right: 0,
@@ -234,13 +329,11 @@ export default function HomeScreen() {
       textTransform: 'uppercase' as const,
       letterSpacing: '1px',
     },
-    eventItem: { display: 'flex', gap: 8, padding: '7px 0', borderBottom: '1px dashed #2a0040', alignItems: 'center' },
+    eventItem: { display: 'flex', gap: 8, padding: '7px 0', borderBottom: '1px dashed #2a0040', alignItems: 'center', cursor: 'pointer' },
     eventDot: { width: 5, height: 5, background: '#da70d6', flexShrink: 0 },
     eventName: { fontSize: 13, color: '#f0c0ff', fontWeight: 'bold' },
     eventDate: { fontSize: 11, color: '#ff69b4', opacity: 0.8 },
-
     middle: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' as const, minHeight: 260 },
-
     resultCard: {
       background: '#0d0020',
       border: '2px solid #ff69b4',
@@ -269,7 +362,6 @@ export default function HomeScreen() {
       fontFamily: "'Press Start 2P', monospace",
     },
     resultValue: { color: '#f0c0ff' },
-
     resultActions: { display: 'flex', gap: 10, marginTop: 14 },
     btnSave: {
       background: '#ff69b4',
@@ -290,7 +382,6 @@ export default function HomeScreen() {
       fontSize: 15,
       cursor: 'pointer',
     },
-
     emptyState: { textAlign: 'center' as const, zIndex: 1, position: 'relative' as const },
     emptyText: {
       fontFamily: "'Press Start 2P', monospace",
@@ -299,9 +390,7 @@ export default function HomeScreen() {
       letterSpacing: '1px',
       lineHeight: 1.8,
     },
-
     bottomArea: { marginTop: 16, position: 'relative' as const, display: 'flex', justifyContent: 'center', width: '100%', boxSizing: 'border-box' },
-
     blobContainer: {
       position: 'relative' as const,
       width: '100%',
@@ -312,7 +401,6 @@ export default function HomeScreen() {
       boxSizing: 'border-box' as const,
       boxShadow: '4px 4px 0 #9b59b6',
     },
-
     blobInput: {
       position: 'absolute' as const,
       zIndex: 2,
@@ -362,7 +450,117 @@ export default function HomeScreen() {
       cursor: 'pointer',
       whiteSpace: 'nowrap' as const,
     },
+    modalOverlay: {
+      position: 'fixed' as const,
+      inset: 0,
+      background: 'rgba(10, 0, 20, 0.85)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 500,
+    },
+    modalCard: {
+      background: '#0d0020',
+      border: '2px solid #ff69b4',
+      padding: '20px',
+      width: 460,
+      maxWidth: '90vw',
+      boxShadow: '6px 6px 0 #9b59b6',
+      position: 'relative' as const,
+      maxHeight: '80vh',
+      overflowY: 'auto' as const,
+    },
+    modalTitle: {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: 11,
+      color: '#ff69b4',
+      marginBottom: 14,
+      paddingBottom: 8,
+      borderBottom: '1px solid #2a0040',
+    },
+    modalField: {
+      marginBottom: 10,
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: 3,
+    },
+    modalLabel: {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: 8,
+      color: '#ff69b4',
+      textTransform: 'uppercase' as const,
+      letterSpacing: '1px',
+    },
+    modalValue: {
+      fontSize: 14,
+      color: '#f0c0ff',
+      padding: '2px 0',
+    },
+    modalInput: {
+      background: '#1a0030',
+      border: '1px solid #9b59b6',
+      padding: '5px 8px',
+      fontFamily: "'VT323', monospace",
+      fontSize: 14,
+      color: '#da70d6',
+      outline: 'none',
+      width: '100%',
+      boxSizing: 'border-box' as const,
+    },
+    modalActions: {
+      display: 'flex',
+      gap: 10,
+      marginTop: 18,
+      flexWrap: 'wrap' as const,
+    },
+    btnEdit: {
+      background: '#2a0040',
+      border: '2px solid #da70d6',
+      padding: '6px 16px',
+      color: '#da70d6',
+      fontFamily: "'VT323', monospace",
+      fontSize: 15,
+      cursor: 'pointer',
+    },
+    btnDelete: {
+      background: 'transparent',
+      border: '2px solid #ff4444',
+      padding: '6px 16px',
+      color: '#ff4444',
+      fontFamily: "'VT323', monospace",
+      fontSize: 15,
+      cursor: 'pointer',
+    },
+    btnClose: {
+      background: 'transparent',
+      border: '1px solid #9b59b6',
+      padding: '6px 16px',
+      color: '#9b59b6',
+      fontFamily: "'VT323', monospace",
+      fontSize: 15,
+      cursor: 'pointer',
+      marginLeft: 'auto' as const,
+    },
+    btnConfirm: {
+      background: '#ff69b4',
+      border: '2px solid #fff',
+      padding: '6px 16px',
+      color: '#1a0a2e',
+      fontWeight: 'bold',
+      fontFamily: "'VT323', monospace",
+      fontSize: 15,
+      cursor: 'pointer',
+    },
   };
+
+  const fields: [string, string][] = [
+    ['type', 'type'],
+    ['date', 'date'],
+    ['time', 'time'],
+    ['location', 'location'],
+    ['people', 'people'],
+    ['notes', 'notes'],
+  ];
 
   return (
     <>
@@ -402,12 +600,16 @@ export default function HomeScreen() {
             </div>
             <div style={{ borderTop: '2px dashed #9b59b6', paddingTop: 10 }}>
               <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, color: '#ff69b4', fontWeight: 'bold', marginBottom: 8, letterSpacing: '1px', lineHeight: 1.8 }}>♡ logged events //</div>
-              {events.slice(0,3).map(ev => (
-                <div key={ev.id} style={{ paddingLeft: 8, borderLeft: '2px solid #ff69b4', marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, color: '#da70d6', fontWeight: 'bold' }}>{ev.title}</div>
-                  <div style={{ fontSize: 10, color: '#f0c0ff', opacity: 0.7 }}>{ev.date} @ {ev.time}</div>
-                </div>
-              ))}
+              {sidebarEvents.length === 0 ? (
+                <div style={{ fontSize: 11, color: '#9b59b6', paddingLeft: 8 }}>no events this month</div>
+              ) : (
+                sidebarEvents.map(ev => (
+                  <div key={ev.id} onClick={() => openEventCard(ev)} style={{ paddingLeft: 8, borderLeft: '2px solid #ff69b4', marginBottom: 8, cursor: 'pointer' }}>
+                    <div style={{ fontSize: 12, color: '#da70d6', fontWeight: 'bold' }}>{ev.title}</div>
+                    <div style={{ fontSize: 10, color: '#f0c0ff', opacity: 0.7 }}>{ev.date} @ {ev.time}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -425,16 +627,46 @@ export default function HomeScreen() {
           {/* TOPBAR */}
           <div style={styles.topbar}>
             <div style={styles.logo}>voiceNova✦</div>
+
+            {/* SEARCH */}
             <div style={styles.searchWrap}>
               <span style={styles.searchIcon}>♡</span>
-              <input style={styles.searchBar} placeholder="search your events..." />
+              <input
+                style={styles.searchBar}
+                placeholder="search your events..."
+                value={searchQuery}
+                onChange={e => handleSearch(e.target.value)}
+                onFocus={() => searchQuery && setShowSearchResults(true)}
+              />
+              {showSearchResults && (
+                <div style={styles.searchDropdown}>
+                  {searchResults.length === 0 ? (
+                    <div style={styles.searchNoResult}>no events found ✦</div>
+                  ) : (
+                    searchResults.map(ev => (
+                      <div
+                        key={ev.id}
+                        style={styles.searchResultItem}
+                        onClick={() => openEventCard(ev)}
+                        onMouseEnter={e => (e.currentTarget.style.background = '#1a0030')}
+                        onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                      >
+                        <span style={styles.searchResultTitle}>{ev.title}</span>
+                        <span style={styles.searchResultMeta}>{ev.date} · {ev.time} · {ev.type}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
-            <div style={styles.upcomingWrap}>
+
+            {/* UPCOMING DROPDOWN */}
+            <div style={styles.upcomingWrap} ref={dropdownRef}>
               <button style={styles.upcomingBtn} onClick={() => setDropdownOpen(!dropdownOpen)}>upcoming events ▾</button>
               <div style={styles.dropdown}>
                 <div style={styles.dropdownTitle}>// incoming_queue</div>
                 {upcomingEvents.map(ev => (
-                  <div key={ev.id} style={styles.eventItem}>
+                  <div key={ev.id} style={styles.eventItem} onClick={() => { openEventCard(ev); setDropdownOpen(false); }}>
                     <div style={styles.eventDot} />
                     <div>
                       <div style={styles.eventName}>{ev.title}</div>
@@ -454,7 +686,7 @@ export default function HomeScreen() {
 
             {loading && (
               <div style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 10, color: '#ff69b4', letterSpacing: '2px', zIndex: 1, position: 'relative' }}>
-                ⋆ parsing your vibes...
+                ⋆ parsing + love the way you talk...
               </div>
             )}
 
@@ -502,6 +734,50 @@ export default function HomeScreen() {
 
         </div>
       </div>
+
+      {/* EVENT DETAIL MODAL */}
+      {selectedEvent && (
+        <div style={styles.modalOverlay} onClick={(e) => { if (e.target === e.currentTarget) closeEventCard(); }}>
+          <div style={styles.modalCard}>
+            <div style={styles.modalTitle}>
+              {editMode ? '✎ editing event' : `✦ ${selectedEvent.title}`}
+            </div>
+
+            {editMode ? (
+              <>
+                <div style={styles.modalField}>
+                  <span style={styles.modalLabel}>title</span>
+                  <input style={styles.modalInput} value={editData.title || ''} onChange={e => setEditData({...editData, title: e.target.value})} />
+                </div>
+                {fields.map(([label, key]) => (
+                  <div key={key} style={styles.modalField}>
+                    <span style={styles.modalLabel}>{label}</span>
+                    <input style={styles.modalInput} value={editData[key] || ''} onChange={e => setEditData({...editData, [key]: e.target.value})} />
+                  </div>
+                ))}
+                <div style={styles.modalActions}>
+                  <button style={styles.btnConfirm} onClick={handleSaveEdit}>✦ save changes</button>
+                  <button style={styles.btnDiscard} onClick={() => { setEditMode(false); setEditData({...selectedEvent}); }}>cancel</button>
+                </div>
+              </>
+            ) : (
+              <>
+                {[['title', selectedEvent.title], ...fields.map(([l, k]) => [l, selectedEvent[k]])].map(([label, val]) => (
+                  <div key={label} style={styles.modalField}>
+                    <span style={styles.modalLabel}>{label}</span>
+                    <span style={styles.modalValue}>{val || '—'}</span>
+                  </div>
+                ))}
+                <div style={styles.modalActions}>
+                  <button style={styles.btnEdit} onClick={() => setEditMode(true)}>✎ edit</button>
+                  <button style={styles.btnDelete} onClick={handleDelete}>✕ delete</button>
+                  <button style={styles.btnClose} onClick={closeEventCard}>close</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
