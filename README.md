@@ -1,3 +1,31 @@
+docker
+# voiceNova setup
+
+## Requirements
+- Docker Desktop (download from docker.com)
+
+## Setup
+1. Clone this repo
+2. Create a `.env` file in the root folder with:
+   GROQ_API_KEY=your_groq_key
+   GMAIL_USER=your_gmail
+   GMAIL_APP_PASSWORD=your_app_password
+   NOTIFY_EMAIL=your_gmail
+
+3. Run: docker-compose up --build
+4. Open: http://localhost:8081
+
+## To stop
+docker-compose down
+
+## To restart later (no rebuild needed)
+docker-compose up
+
+
+
+
+
+
 empty your thoughts, i'll organize them ─── ⋆
 
  modules
